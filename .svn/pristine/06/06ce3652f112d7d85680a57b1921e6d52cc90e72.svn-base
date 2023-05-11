@@ -1,0 +1,217 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using HCP.Pharma.DL;
+using HCP.Pharma.DL.Entities;
+using HCP.Pharma.DO;
+using HCP.Pharma.DL.Repository;
+using HCP.Pharma.IF;
+using Microsoft.EntityFrameworkCore;
+
+namespace HCP.Pharma.DL.Repository
+{
+    public class DrugFormulationRepository : IDrugFormulationRepository
+    {
+        public async Task<List<DO_DrugFormulation>> GetDrugFormulationListByNamePrefix(string drugFormulationPrefix)
+        {
+            try
+            {
+                using (var db = new eSyaEnterprise())
+                {
+                    var result = await db.GtEpdrfr
+                        .Join(db.GtEpdrgn,
+                        t => new { t.GenericId },
+                        b => new { b.GenericId },
+                        (t, b) => new { t, b })
+                         .Join(db.GtEcapcd,
+                        tb => new { ApplicationCode = tb.b.DrugClassId },
+                        d => new { d.ApplicationCode },
+                        (tb, d) => new { tb, d })
+                        .Join(db.GtEcapcd,
+                        tbd => new { ApplicationCode = tbd.tb.t.Dosage },
+                        e => new { e.ApplicationCode },
+                        (tbd, e) => new { tbd, e })
+                        .Join(db.GtEcapcd,
+                        tbde => new { ApplicationCode = tbde.tbd.tb.t.DrugForm },
+                        f => new { f.ApplicationCode },
+                        (tbde, f) => new { tbde, f })
+                         .Where(w => w.tbde.tbd.tb.t.DrugFormulation.StartsWith(drugFormulationPrefix != "All" ? drugFormulationPrefix : ""))
+                        .Select(a => new DO_DrugFormulation
+                        {
+                            GenericId = a.tbde.tbd.tb.t.GenericId,
+                            GenericDesc = a.tbde.tbd.tb.b.GenericDesc,
+                            DrugFormulaID = a.tbde.tbd.tb.t.DrugFormulaId,
+                            DrugFormulation = a.tbde.tbd.tb.t.DrugFormulation,
+                            DrugClassId = a.tbde.tbd.tb.b.DrugClassId,
+                            DrugClassDesc = a.tbde.tbd.d.CodeDesc,
+                            Dosage = a.tbde.tbd.tb.t.Dosage,
+                            DosageDesc = a.tbde.e.CodeDesc,
+                            DrugForm = a.tbde.tbd.tb.t.DrugForm,
+                            DrugFormDesc = a.f.CodeDesc,
+                            UsageStatus = a.tbde.tbd.tb.t.UsageStatus,
+                            ActiveStatus = a.tbde.tbd.tb.t.ActiveStatus
+                        }).ToListAsync();
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertOrUpdateDrugFormulation(DO_DrugFormulation drugFormulation)
+        {
+            try
+            {
+                if (drugFormulation.DrugFormulaID != 0)
+                {
+                    return await UpdateDrugFormulation(drugFormulation);
+                }
+                else
+                {
+                    return await InsertDrugFormulation(drugFormulation);
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertDrugFormulation(DO_DrugFormulation obj)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrfr isFormulationExists = db.GtEpdrfr.FirstOrDefault(c => c.DrugFormulation.ToUpper().Replace(" ", "") == obj.DrugFormulation.ToUpper().Replace(" ", ""));
+
+                        if (isFormulationExists == null)
+                        {
+                            int drugFormulationId = db.GtEpdrfr.Select(c => c.DrugFormulaId).DefaultIfEmpty().Max();
+                            drugFormulationId = drugFormulationId + 1;
+                            var epdrfr = new GtEpdrfr
+                            {
+                                GenericId = obj.GenericId,
+                                DrugFormulaId = drugFormulationId,
+                                DrugFormulation = obj.DrugFormulation,
+                                Dosage = obj.Dosage,
+                                DrugForm = obj.DrugForm,
+                                UsageStatus = false,
+                                ActiveStatus = obj.ActiveStatus,
+                                CreatedBy = obj.UserID,
+                                CreatedOn = DateTime.Now,
+                                CreatedTerminal = obj.TerminalID
+                            };
+                            db.GtEpdrfr.Add(epdrfr);
+
+                            await db.SaveChangesAsync();
+                            dbContext.Commit();
+                            return new DO_ReturnParameter() { Status = true, Message = "Drug Formulation created Successfully." };
+                        }
+                        else
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Formulation is already in use." };
+                        }
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+
+        public async Task<DO_ReturnParameter> UpdateDrugFormulation(DO_DrugFormulation obj)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrfr ismnfcExists = db.GtEpdrfr.FirstOrDefault(c => c.DrugFormulaId != obj.DrugFormulaID && c.DrugFormulation.ToUpper().Replace(" ", "") == obj.DrugFormulation.ToUpper().Replace(" ", ""));
+                        if (ismnfcExists != null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Formulation is already exist." };
+                        }
+
+                        GtEpdrfr dc_Id = db.GtEpdrfr.Where(s => s.DrugFormulaId == obj.DrugFormulaID).FirstOrDefault();
+                        if (dc_Id == null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Formulation Id does not exist" };
+                        }
+
+                        dc_Id.GenericId = obj.GenericId;
+                        dc_Id.DrugFormulaId = obj.DrugFormulaID;
+                        dc_Id.DrugFormulation = obj.DrugFormulation;
+                        dc_Id.Dosage = obj.Dosage;
+                        dc_Id.DrugForm = obj.DrugForm;
+                        dc_Id.ActiveStatus = obj.ActiveStatus;
+                        dc_Id.ModifiedBy = obj.UserID;
+                        dc_Id.ModifiedOn = DateTime.Now;
+                        dc_Id.ModifiedTerminal = obj.TerminalID;
+                        
+                        await db.SaveChangesAsync();
+                        dbContext.Commit();
+
+                        return new DO_ReturnParameter() { Status = true, Message = "Drug Formulation Updated Successfully." };
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+
+        public async Task<DO_DrugFormulation> GetDrugFormulationDetails(int DrugFormulaId)
+        {
+            try
+            {
+                using (var db = new eSyaEnterprise())
+                {
+                    var ds = db.GtEpdrfr
+                        .Join(db.GtEcapcd,
+                        t => new { ApplicationCode = t.Dosage },
+                        b => new { b.ApplicationCode },
+                        (t, b) => new { t, b })
+                        .Join(db.GtEcapcd,
+                        tb => new { ApplicationCode = tb.t.DrugForm },
+                        d => new { d.ApplicationCode },
+                        (tb, d) => new { tb, d })
+                        .Where(w => w.tb.t.DrugFormulaId == DrugFormulaId)
+                        .Select(r => new DO_DrugFormulation
+                        {
+                            Dosage = r.tb.t.Dosage,
+                            DosageDesc = r.tb.b.CodeDesc,
+                            DrugForm = r.tb.t.DrugForm,
+                            DrugFormDesc = r.d.CodeDesc, 
+                        }).FirstOrDefaultAsync();
+
+                    return await ds;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+    }
+}

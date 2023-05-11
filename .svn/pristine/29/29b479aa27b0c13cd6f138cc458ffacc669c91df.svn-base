@@ -1,0 +1,167 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using eSyaPharma.DL;
+using eSyaPharma.DL.Entities;
+using eSyaPharma.DO;
+using eSyaPharma.DL.Repository;
+using eSyaPharma.IF;
+using Microsoft.EntityFrameworkCore;
+
+namespace eSyaPharma.DL.Repository
+{
+    public class DrugManufacturerRepository : IDrugManufacturerRepository
+    {
+        public async Task<List<DO_DrugManufacturer>> GetManufacturerListByNamePrefix(string manufacturerNamePrefix)
+        {
+            try
+            {
+                using (var db = new eSyaEnterprise())
+                {
+                    var ds = db.GtEpdrmf
+                        .Where(w => w.ManufacturerName.StartsWith(manufacturerNamePrefix != "All" ? manufacturerNamePrefix: "" ))
+                        .Select(r => new DO_DrugManufacturer
+                        {
+                            ManufacturerID = r.ManufacturerId,
+                            ManfShortName = r.ManfShortName,
+                            ManufacturerName = r.ManufacturerName,
+                            OriginCode = r.OriginCode,
+                            MarketedBy = r.MarketedBy,
+                            ISDCode = r.Isdcode,
+                            ActiveStatus = r.ActiveStatus
+                        }).OrderBy(o => o.ManufacturerName).ToListAsync();
+
+                    return await ds;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertOrUpdateManufacturer(DO_DrugManufacturer drugManufacturer)
+        {
+            try
+            {
+                if (drugManufacturer.ManufacturerID != 0)
+                {
+                    return await UpdateManufacturer(drugManufacturer);
+                }
+                else
+                {
+                    return await InsertManufacturer(drugManufacturer);
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertManufacturer(DO_DrugManufacturer drugManufacturer)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrmf isManufacturerExists = db.GtEpdrmf.FirstOrDefault(c => c.ManufacturerName.ToUpper().Replace(" ", "") == drugManufacturer.ManufacturerName.ToUpper().Replace(" ", ""));
+
+                        if (isManufacturerExists == null)
+                        {
+                            int mnfId = db.GtEpdrmf.Select(c => c.ManufacturerId).DefaultIfEmpty().Max();
+                            mnfId = mnfId + 1;
+                            var obmnfc = new GtEpdrmf
+                            {
+                                ManufacturerId = mnfId,
+                                ManufacturerName = drugManufacturer.ManufacturerName,
+                                ManfShortName = drugManufacturer.ManfShortName,
+                                OriginCode = drugManufacturer.OriginCode,
+                                MarketedBy = drugManufacturer.MarketedBy,
+                                Isdcode = drugManufacturer.ISDCode,
+                                UsageStatus = false,
+                                //FormId = drugManufacturer.FormId,
+                                ActiveStatus = drugManufacturer.ActiveStatus,
+                                CreatedBy = drugManufacturer.UserID,
+                                CreatedOn = DateTime.Now,
+                                CreatedTerminal = drugManufacturer.TerminalID
+                            };
+                            db.GtEpdrmf.Add(obmnfc);
+
+
+                            await db.SaveChangesAsync();
+                            dbContext.Commit();
+                            return new DO_ReturnParameter() { Status = true, Message = "Manufacturer created Successfully." };
+                        }
+                        else
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Manufacturer Name is already in use." };
+                        }
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+
+        public async Task<DO_ReturnParameter> UpdateManufacturer(DO_DrugManufacturer drugManufacturer)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrmf ismnfcExists = db.GtEpdrmf.FirstOrDefault(c => c.ManufacturerId != drugManufacturer.ManufacturerID && c.ManufacturerName.ToUpper().Replace(" ", "") == drugManufacturer.ManufacturerName.ToUpper().Replace(" ", ""));
+                        if (ismnfcExists != null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Manufacturer Name is already exist." };
+                        }
+
+                        GtEpdrmf mnfc_Id = db.GtEpdrmf.Where(s => s.ManufacturerId == drugManufacturer.ManufacturerID).FirstOrDefault();
+                        if (mnfc_Id == null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Manufacturer Code does not exist" };
+                        }
+
+                        mnfc_Id.ManufacturerName = drugManufacturer.ManufacturerName;
+                        mnfc_Id.ManfShortName = drugManufacturer.ManfShortName;
+                        mnfc_Id.OriginCode = drugManufacturer.OriginCode;
+                        mnfc_Id.MarketedBy = drugManufacturer.MarketedBy;
+                        mnfc_Id.Isdcode = drugManufacturer.ISDCode;
+                        mnfc_Id.ActiveStatus = drugManufacturer.ActiveStatus;
+                        mnfc_Id.ModifiedBy = drugManufacturer.UserID;
+                        mnfc_Id.ModifiedOn = DateTime.Now;
+                        mnfc_Id.ModifiedTerminal = drugManufacturer.TerminalID;
+                        
+                        await db.SaveChangesAsync();
+                        dbContext.Commit();
+
+                        return new DO_ReturnParameter() { Status = true, Message = "Manufacturer Updated Successfully." };
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+    }
+}

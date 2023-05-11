@@ -1,0 +1,19 @@
+﻿using eSyaPharma.DO;
+using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace eSyaPharma.IF
+{
+   public interface IDrugBrandRepository
+    {
+        Task<List<DO_DrugBrand>> GetDrugBrandListByNamePrefix(int drugFormulaId, string drugBrandPrefix);
+
+        Task<DO_DrugBrand> GetDrugParameterList(int drugCode);
+
+        Task<bool> IsDrugVolumeRequired(int packingID);
+
+        Task<DO_ReturnParameter> InsertOrUpdateDrugBrand(DO_DrugBrand drugBrand);
+    }
+}

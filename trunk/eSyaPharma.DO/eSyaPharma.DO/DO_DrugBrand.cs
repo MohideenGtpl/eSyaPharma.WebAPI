@@ -1,0 +1,99 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+
+namespace HCP.Pharma.DO
+{
+    public class DO_DrugBrand
+    {
+        public int DrugCode { get; set; }
+        public int ISDCode { get; set; }
+        public int GenericID { get; set; }
+        public string GenericDesc { get; set; }
+        public int DrugFormulaID { get; set; }
+        public string DrugFormulation { get; set; }
+        public int ManufacturerID { get; set; }
+        public string Manufacturer { get; set; }
+        public string DrugBrand { get; set; }
+        public string DrugPrintDesc { get; set; }
+        public int PackSize { get; set; }
+        public int PackingId { get; set; }
+        public string Packing { get; set; }
+        public string DrugVolume { get; set; }
+        public decimal ReferenceMRP { get; set; }
+        public string BarcodeID { get; set; }
+        public bool UsageStatus { get; set; }
+        public bool ActiveStatus { get; set; }
+        public string FormId { get; set; }
+        public int UserID { get; set; }
+        public string TerminalID { get; set; }
+
+        public List<DO_eSyaParameter> l_FormParameter { get; set; }
+    }
+
+    public class DO_DrugBusinessLink
+    {
+        public int GenericID { get; set; }
+        public string GenericDesc { get; set; }
+        public int DrugCode { get; set; }
+        public string DrugBrand { get; set; }
+        public int BusinessKey { get; set; }
+        public bool ActiveStatus { get; set; }
+        public string FormId { get; set; }
+        public int UserID { get; set; }
+        public string TerminalID { get; set; }
+    }
+
+    public class DO_DrugReorderLevel
+    {
+        public int BusinessKey { get; set; }
+        public int StoreCode { get; set; }
+        public int DrugCode { get; set; }
+        public string DrugBrand { get; set; }
+        public decimal MaximumStockLevel { get; set; }
+        public decimal ReorderLevel { get; set; }
+        public decimal SafetyStockLevel { get; set; }
+        public decimal MinimumStockLevel { get; set; }
+        public bool ActiveStatus { get; set; }
+        public string FormID { get; set; }
+        public int UserID { get; set; }
+        public DateTime CreatedOn { get; set; }
+        public string TerminalID { get; set; }
+    }
+
+    public class DO_DrugBinInfo
+    {
+        public int BusinessKey { get; set; }
+        public int StoreCode { get; set; }
+        public int DrugCode { get; set; }
+        public string DrugBrand { get; set; }
+        public decimal MaximumStockLevel { get; set; }
+        public decimal ReorderLevel { get; set; }
+        public decimal SafetyStockLevel { get; set; }
+        public decimal MinimumStockLevel { get; set; }
+        public string BinInfo { get; set; }
+        public bool ActiveStatus { get; set; }
+        public string FormID { get; set; }
+        public int UserID { get; set; }
+        public DateTime CreatedOn { get; set; }
+        public string TerminalID { get; set; }
+    }
+
+    public class DO_DrugVendorLink
+    {
+        public int VendorCode { get; set; }
+        public string VendorName { get; set; }
+        public int DrugCode { get; set; }
+        public string DrugBrand { get; set; }
+        public decimal BusinessShare { get; set; }
+        public decimal MinimumSupplyQty { get; set; }
+        public string RateType { get; set; }
+        public string RateTypeDesc { get; set; }
+        public decimal Rate { get; set; }
+        public bool ActiveStatus { get; set; }
+        public string FormID { get; set; }
+        public int UserID { get; set; }
+        public DateTime CreatedOn { get; set; }
+        public string TerminalID { get; set; }
+    }
+}

@@ -1,0 +1,17 @@
+{
+  "runtimeOptions": {
+    "additionalProbingPaths": [
+<<<<<<< .mine
+      "C:\\Users\\Mohideen\\.dotnet\\store\\|arch|\\|tfm|",
+      "C:\\Users\\Mohideen\\.nuget\\packages",
+||||||| .r27
+      "C:\\Users\\Dell PC\\.dotnet\\store\\|arch|\\|tfm|",
+      "C:\\Users\\Dell PC\\.nuget\\packages",
+=======
+      "C:\\Users\\Abdul Rahiman\\.dotnet\\store\\|arch|\\|tfm|",
+      "C:\\Users\\Abdul Rahiman\\.nuget\\packages",
+>>>>>>> .r28
+      "C:\\Program Files\\dotnet\\sdk\\NuGetFallbackFolder"
+    ]
+  }
+}

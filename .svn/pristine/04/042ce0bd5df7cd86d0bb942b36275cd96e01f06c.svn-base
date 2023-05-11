@@ -1,0 +1,21 @@
+﻿using System;
+using System.Collections.Generic;
+
+namespace eSyaPharma.DL.Entities
+{
+    public partial class GtEpdrpa
+    {
+        public int DrugCode { get; set; }
+        public int ParameterId { get; set; }
+        public bool ParamAction { get; set; }
+        public bool ActiveStatus { get; set; }
+        public int CreatedBy { get; set; }
+        public DateTime CreatedOn { get; set; }
+        public string CreatedTerminal { get; set; }
+        public int? ModifiedBy { get; set; }
+        public DateTime? ModifiedOn { get; set; }
+        public string ModifiedTerminal { get; set; }
+
+        public virtual GtEpdrcd DrugCodeNavigation { get; set; }
+    }
+}

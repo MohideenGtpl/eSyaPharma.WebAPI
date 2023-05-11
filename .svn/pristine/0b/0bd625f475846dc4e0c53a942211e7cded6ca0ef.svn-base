@@ -1,0 +1,101 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using HCP.Pharma.IF;
+using Microsoft.AspNetCore.Mvc;
+
+namespace HCP.Pharma.WebAPI.Controllers
+{
+    [Route("api/[controller]/[action]")]
+    [ApiController]
+    public class CommonDataController : ControllerBase
+    {
+
+        private readonly ICommonDataRepository _commonDataRepository;
+        public CommonDataController(ICommonDataRepository commonDataRepository)
+        {
+            _commonDataRepository = commonDataRepository;
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetApplicationCodesByCodeType(int codeType)
+        {
+            var ds = await _commonDataRepository.GetApplicationCodesByCodeType(codeType);
+            return Ok(ds);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GetApplicationCodesByCodeTypeList(List<int> l_codeType)
+        {
+            var ds = await _commonDataRepository.GetApplicationCodesByCodeTypeList(l_codeType);
+            return Ok(ds);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetBusinessKey()
+        {
+            var ds = await _commonDataRepository.GetBusinessKey();
+            return Ok(ds);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetISDCodes()
+        {
+            var ds = await _commonDataRepository.GetISDCodes();
+            return Ok(ds);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetGenericDetails(int drugCategory)
+        {
+            var i_Codes = await _commonDataRepository.GetGenericDetails(drugCategory);
+            return Ok(i_Codes);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetDrugFormulationList(int DrugGenerics)
+        {
+            var ds = await _commonDataRepository.GetDrugFormulationList(DrugGenerics);
+            return Ok(ds);
+        }
+
+        [HttpGet]
+        public async Task<IActionResult> GetManufacturerList()
+        {
+            var ds = await _commonDataRepository.GetManufacturerList();
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Store List By BusinessKey.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetStoreListByBusinessKey(int BusinessKey)
+        {
+            var ds = await _commonDataRepository.GetStoreListByBusinessKey(BusinessKey);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Vendor List.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetVendorList()
+        {
+            var ds = await _commonDataRepository.GetVendorList();
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Drug List.
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetDrugList()
+        {
+            var ds = await _commonDataRepository.GetDrugList();
+            return Ok(ds);
+        }
+
+    }
+}

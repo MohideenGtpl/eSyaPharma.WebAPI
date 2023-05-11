@@ -1,0 +1,258 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using eSyaPharma.DL;
+using eSyaPharma.DL.Entities;
+using eSyaPharma.DO;
+using eSyaPharma.DL.Repository;
+using eSyaPharma.IF;
+using Microsoft.EntityFrameworkCore;
+
+namespace eSyaPharma.DL.Repository
+{
+    public class DrugBrandRepository : IDrugBrandRepository
+    {
+        public async Task<List<DO_DrugBrand>> GetDrugBrandListByNamePrefix(int drugFormulaId, string drugBrandPrefix)
+        {
+            try
+            {
+                using (var db = new eSyaEnterprise())
+                {
+                    var result = await db.GtEpdrcd
+                             .Join(db.GtEpdrmf,
+                             t => new { t.ManufacturerId },
+                             b => new { b.ManufacturerId },
+                             (t, b) => new { t, b })
+                         .GroupJoin(db.GtEcapcd,
+                        tb => new { ApplicationCode = tb.t.Packing },
+                        d => new { d.ApplicationCode },
+                        (tb, d) => new { tb, d = d.FirstOrDefault() })
+                         .Where(w => w.tb.t.DrugFormulaId == drugFormulaId && w.tb.t.DrugBrand.StartsWith(drugBrandPrefix != "All" ? drugBrandPrefix : ""))
+                        .Select(a => new DO_DrugBrand
+                        {
+                            DrugCode = a.tb.t.DrugCode,
+                            DrugBrand = a.tb.t.DrugBrand,
+                            ManufacturerID = a.tb.t.ManufacturerId,
+                            Manufacturer = a.tb.b.ManufacturerName,
+                            DrugPrintDesc = a.tb.t.DrugPrintDesc,
+                            PackSize = a.tb.t.PackSize,
+                            PackingId = a.tb.t.Packing,
+                            Packing = a.d.CodeDesc,
+                            DrugVolume = a.tb.t.DrugVolume,
+                            ReferenceMRP = a.tb.t.ReferenceMrp,
+                            BarcodeID = a.tb.t.BarcodeId,
+                            ActiveStatus = a.tb.t.ActiveStatus
+                        }).ToListAsync();
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<DO_DrugBrand> GetDrugParameterList(int drugCode)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                try
+                {
+                    var ds = db.GtEpdrcd
+                        .Where(w => w.DrugCode == drugCode)
+                        .Select(r => new DO_DrugBrand
+                        {
+                            l_FormParameter = r.GtEpdrpa.Select(p => new DO_eSyaParameter
+                            {
+                                ParameterID = p.ParameterId,
+                                ParmAction = p.ParamAction
+                            }).ToList()
+                        }).FirstOrDefaultAsync();
+
+                    return await ds;
+                }
+                catch (Exception ex)
+                {
+                    throw ex;
+                }
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertOrUpdateDrugBrand(DO_DrugBrand drugBrand)
+        {
+            try
+            {
+                if (drugBrand.DrugCode != 0)
+                {
+                    return await UpdateDrugBrand(drugBrand);
+                }
+                else
+                {
+                    return await InsertDrugBrand(drugBrand);
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertDrugBrand(DO_DrugBrand obj)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrcd isBrandExists = db.GtEpdrcd.FirstOrDefault(c => c.DrugBrand.ToUpper().Replace(" ", "") == obj.DrugBrand.ToUpper().Replace(" ", ""));
+
+                        if (isBrandExists == null)
+                        {
+                            int drugCode = db.GtEpdrcd.Select(c => c.DrugCode).DefaultIfEmpty().Max();
+                            drugCode = drugCode + 1;
+                            var epdrbr = new GtEpdrcd
+                            {
+                                DrugCode = drugCode,
+                                Isdcode = obj.ISDCode,
+                                GenericId = obj.GenericID,
+                                DrugFormulaId = obj.DrugFormulaID,
+                                ManufacturerId = obj.ManufacturerID,
+                                DrugBrand = obj.DrugBrand,
+                                DrugPrintDesc = obj.DrugPrintDesc,
+                                PackSize = obj.PackSize,
+                                Packing = obj.PackingId,
+                                DrugVolume = obj.DrugVolume,
+                                ReferenceMrp = 0,
+                                BarcodeId = obj.BarcodeID,
+                                UsageStatus = false,
+                                ActiveStatus = obj.ActiveStatus,
+                                CreatedBy = obj.UserID,
+                                CreatedOn = DateTime.Now,
+                                CreatedTerminal = obj.TerminalID
+                            };
+                            db.GtEpdrcd.Add(epdrbr);
+
+                            foreach (DO_eSyaParameter ip in obj.l_FormParameter)
+                            {
+                                var pMaster = new GtEpdrpa
+                                {
+                                    DrugCode = drugCode,
+                                    ParameterId = ip.ParameterID,
+                                    ParamAction = ip.ParmAction,
+                                    ActiveStatus = ip.ActiveStatus,
+                                    CreatedBy = obj.UserID,
+                                    CreatedOn = System.DateTime.Now,
+                                    CreatedTerminal = obj.TerminalID,
+                                };
+                                db.GtEpdrpa.Add(pMaster);
+                            }
+
+                            await db.SaveChangesAsync();
+                            dbContext.Commit();
+                            return new DO_ReturnParameter() { Status = true, Message = "Drug Brand created Successfully." };
+                        }
+                        else
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Brand is already in used." };
+                        }
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+
+        public async Task<DO_ReturnParameter> UpdateDrugBrand(DO_DrugBrand obj)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrcd isdrcdExists = db.GtEpdrcd.FirstOrDefault(c => c.DrugCode != obj.DrugCode && c.DrugBrand.ToUpper().Replace(" ", "") == obj.DrugBrand.ToUpper().Replace(" ", ""));
+                        if (isdrcdExists != null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Brand is already exist." };
+                        }
+
+                        GtEpdrcd dc_Id = db.GtEpdrcd.Where(s => s.DrugCode == obj.DrugCode).FirstOrDefault();
+                        if (dc_Id == null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Brand Id does not exist" };
+                        }
+
+                        dc_Id.Isdcode = obj.ISDCode;
+                        dc_Id.GenericId = obj.GenericID;
+                        dc_Id.DrugFormulaId = obj.DrugFormulaID;
+                        dc_Id.ManufacturerId = obj.ManufacturerID;
+                        dc_Id.DrugBrand = obj.DrugBrand;
+                        dc_Id.DrugBrand = obj.DrugBrand;
+                        dc_Id.DrugPrintDesc = obj.DrugPrintDesc;
+                        dc_Id.PackSize = obj.PackSize;
+                        dc_Id.Packing = obj.PackingId;
+                        dc_Id.DrugVolume = obj.DrugVolume;
+                        dc_Id.ReferenceMrp = 0;
+                        dc_Id.BarcodeId = obj.BarcodeID;
+                        dc_Id.ActiveStatus = obj.ActiveStatus;
+                        dc_Id.ModifiedBy = obj.UserID;
+                        dc_Id.ModifiedOn = DateTime.Now;
+                        dc_Id.ModifiedTerminal = obj.TerminalID;
+
+                        foreach (DO_eSyaParameter ip in obj.l_FormParameter)
+                        {
+                            GtEpdrpa sPar = db.GtEpdrpa.Where(x => x.DrugCode == obj.DrugCode && x.ParameterId == ip.ParameterID).FirstOrDefault();
+                            if (sPar != null)
+                            {
+                                sPar.ParamAction = ip.ParmAction;
+                                sPar.ActiveStatus = obj.ActiveStatus;
+                                sPar.ModifiedBy = obj.UserID;
+                                sPar.ModifiedOn = System.DateTime.Now;
+                                sPar.ModifiedTerminal = obj.TerminalID;
+                            }
+                            else
+                            {
+                                var pMaster = new GtEpdrpa
+                                {
+                                    DrugCode = obj.DrugCode,
+                                    ParameterId = ip.ParameterID,
+                                    ParamAction = ip.ParmAction,
+                                    ActiveStatus = ip.ActiveStatus,
+                                    CreatedBy = obj.UserID,
+                                    CreatedOn = System.DateTime.Now,
+                                    CreatedTerminal = obj.TerminalID,
+                                };
+                                db.GtEpdrpa.Add(pMaster);
+                            }
+                        }
+
+                        await db.SaveChangesAsync();
+                        dbContext.Commit();
+
+                        return new DO_ReturnParameter() { Status = true, Message = "Drug Brand Updated Successfully." };
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+    }
+}

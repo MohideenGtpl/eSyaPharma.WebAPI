@@ -1,0 +1,156 @@
+﻿using HCP.Pharma.DL.Repository;
+using HCP.Pharma.DO;
+using HCP.Pharma.IF;
+using Microsoft.AspNetCore.Mvc;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+
+namespace HCP.Pharma.WebAPI.Controllers
+{
+    [Route("api/[controller]/[action]")]
+    [ApiController]
+    public class GenericController : ControllerBase
+    {
+        private readonly IGenericRepository _GenericRepository;
+        private readonly ICommonDataRepository _commonDataRepository;
+        public GenericController(IGenericRepository GenericRepository , ICommonDataRepository commonDataRepository)
+        {
+            _GenericRepository = GenericRepository;
+            _commonDataRepository = commonDataRepository;
+        }
+
+        #region Generic
+        /// <summary>
+        /// Getting  Drug Characteristics List.
+        /// UI Reffered - Generic 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetDrugCharacteristicsByTypeList(string l_type)
+        {
+            List<string> _list = l_type.Split(new char[] { ',' }, StringSplitOptions.None).ToList();
+            var ds = await _GenericRepository.GetDrugCharacteristicsByTypeList(_list);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Generic List.
+        /// UI Reffered - Generic 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetGenericByPrefix(string prefix)
+        {
+            var ds = await _GenericRepository.GetGenericByPrefix(prefix);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Generic By ID.
+        /// UI Reffered - Generic 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetGenericByID(int GenericID)
+        {
+            var ds = await _GenericRepository.GetGenericByID(GenericID);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Add Or Update Generic.
+        /// UI Reffered - Generic
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> AddOrUpdateGeneric(DO_Generic obj)
+        {
+            var msg = await _GenericRepository.AddOrUpdateGeneric(obj);
+            return Ok(msg);
+        }
+
+        /// <summary>
+        /// Getting  Drug Class List.
+        /// UI Reffered - Generic
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetDrugClass()
+        {
+            var ds = await _commonDataRepository.GetApplicationCodesByCodeType(CodeTypeValue.DrugClass);
+            return Ok(ds);
+        }
+
+        #endregion
+
+        #region Composition
+
+        /// <summary>
+        /// Getting  Composition List.
+        /// UI Reffered - Composition 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetCompositionByPrefix(string prefix)
+        {
+            var ds = await _GenericRepository.GetCompositionByPrefix(prefix);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Composition By ID.
+        /// UI Reffered - Composition 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetCompositionByID(int CompositionID)
+        {
+            var ds = await _GenericRepository.GetCompositionByID(CompositionID);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Add Or Update Composition.
+        /// UI Reffered - Composition
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> AddOrUpdateComposition(DO_Composition obj)
+        {
+            var msg = await _GenericRepository.AddOrUpdateComposition(obj);
+            return Ok(msg);
+        }
+
+        #endregion
+
+        #region Generic/Composition Link
+        /// <summary>
+        /// Getting Generic/Composition Link List.
+        /// UI Reffered - Generic/Composition 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetGenericComposition(string prefix)
+        {
+            var ds = await _GenericRepository.GetGenericComposition(prefix);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Getting  Generic/Composition Link.
+        /// UI Reffered - Generic/Composition 
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetGenericCompositionByID(int GenericID, int CompositionID)
+        {
+            var ds = await _GenericRepository.GetGenericCompositionByID(GenericID,CompositionID);
+            return Ok(ds);
+        }
+
+        /// <summary>
+        /// Add Or Update Generic/Composition Link.
+        /// UI Reffered - Generic/Composition
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> AddOrUpdateGenericComposition(DO_GenericComposition obj)
+        {
+            var msg = await _GenericRepository.AddOrUpdateGenericComposition(obj);
+            return Ok(msg);
+        }
+
+        #endregion
+    }
+}

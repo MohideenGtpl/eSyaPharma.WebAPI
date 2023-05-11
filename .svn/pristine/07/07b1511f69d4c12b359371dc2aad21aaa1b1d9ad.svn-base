@@ -1,0 +1,481 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using HCP.Pharma.DL;
+using HCP.Pharma.DL.Entities;
+using HCP.Pharma.DO;
+using HCP.Pharma.DL.Repository;
+using HCP.Pharma.IF;
+using Microsoft.EntityFrameworkCore;
+
+namespace HCP.Pharma.DL.Repository
+{
+    public class GenericRepository : IGenericRepository
+    {
+        private eSyaEnterprise _context { get; set; }
+        public GenericRepository(eSyaEnterprise context)
+        {
+            _context = context;
+        }
+        #region Generic
+        public async Task<List<DO_DrugCharacteristics>> GetDrugCharacteristicsByTypeList(List<string> l_type)
+        {
+            try
+            {
+                    var ds = _context.GtEpdtms
+                        .Where(w => l_type.Contains(w.Type.ToString()) && w.ActiveStatus)
+                        .Select(r => new DO_DrugCharacteristics
+                        {
+                            Id = r.Id,
+                            Description = r.Description,
+                            Type=r.Type
+                        }).OrderBy(o => o.Description).ToListAsync();
+
+                    return await ds;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<List<DO_Generic>> GetGenericByPrefix(string prefix)
+        {
+            try
+            {
+               
+                    var ds = _context.GtEpdrgn
+                        .GroupJoin(_context.GtEpdtms,
+                          g=> g.TheraupaticClass,
+                          c=> c.Id,
+                          (g,c) => new {g,c=c.FirstOrDefault()}
+                          )
+                        .GroupJoin(_context.GtEpdtms,
+                          gc => gc.g.PharmacyGroup,
+                          p => p.Id,
+                          (gc, p) => new { gc, p = p.FirstOrDefault() }
+                          )
+                          .GroupJoin(_context.GtEpdtms,
+                          gcp => gcp.gc.g.UsedinTreatOf,
+                          t => t.Id,
+                          (gcp, t) => new { gcp, t = t.FirstOrDefault() }
+                          )
+                          
+                        .Where(w => (w.gcp.gc.g.GenericDesc.StartsWith(prefix) || prefix == "All"))
+                        .Select(r => new DO_Generic
+                        {
+                            GenericId = r.gcp.gc.g.GenericId,
+                            GenericDesc = r.gcp.gc.g.GenericDesc,
+                            IsCombiDrug = r.gcp.gc.g.IsCombiDrug,
+                            TheraupaticClass= r.gcp.gc.g.TheraupaticClass,
+                            PharmacyGroup= r.gcp.gc.g.PharmacyGroup,
+                            UsedinTreatOf = r.gcp.gc.g.UsedinTreatOf,
+                            NoOfManufacturers= r.gcp.gc.g.NoOfManufacturers,
+                            NoOfComposition= r.gcp.gc.g.NoOfComposition,
+                            NoOfBrands= r.gcp.gc.g.NoOfBrands,
+                            NoOfVendors= r.gcp.gc.g.NoOfVendors,
+                            UsageStatus = r.gcp.gc.g.UsageStatus,
+                            ActiveStatus = r.gcp.gc.g.ActiveStatus,
+                            StrTheraupaticClass = r.gcp.gc.c.Description,
+                            StrPharmacyGroup = r.gcp.p.Description,
+                            StrUsedinTreatOf = r.t.Description,
+
+                        }).OrderBy(o => o.GenericDesc).ToListAsync();
+
+                    return await ds;
+                
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<DO_Generic> GetGenericByID(int GenericID)
+        {
+            try
+            {
+
+                var ds = _context.GtEpdrgn
+                    .GroupJoin(_context.GtEpdtms,
+                      g => g.TheraupaticClass,
+                      c => c.Id,
+                      (g, c) => new { g, c = c.FirstOrDefault() }
+                      )
+                    .GroupJoin(_context.GtEpdtms,
+                      gc => gc.g.PharmacyGroup,
+                      p => p.Id,
+                      (gc, p) => new { gc, p = p.FirstOrDefault() }
+                      )
+                      .GroupJoin(_context.GtEpdtms,
+                      gcp => gcp.gc.g.UsedinTreatOf,
+                      t => t.Id,
+                      (gcp, t) => new { gcp, t = t.FirstOrDefault() }
+                      )
+
+                    .Where(w => w.gcp.gc.g.GenericId == GenericID)
+                    .Select(r => new DO_Generic
+                    {
+                        GenericId = r.gcp.gc.g.GenericId,
+                        GenericDesc = r.gcp.gc.g.GenericDesc,
+                        IsCombiDrug = r.gcp.gc.g.IsCombiDrug,
+                        TheraupaticClass = r.gcp.gc.g.TheraupaticClass,
+                        PharmacyGroup = r.gcp.gc.g.PharmacyGroup,
+                        UsedinTreatOf = r.gcp.gc.g.UsedinTreatOf,
+                        NoOfManufacturers = r.gcp.gc.g.NoOfManufacturers,
+                        NoOfComposition = r.gcp.gc.g.NoOfComposition,
+                        NoOfBrands = r.gcp.gc.g.NoOfBrands,
+                        NoOfVendors = r.gcp.gc.g.NoOfVendors,
+                        UsageStatus = r.gcp.gc.g.UsageStatus,
+                        ActiveStatus = r.gcp.gc.g.ActiveStatus,
+                        StrTheraupaticClass = r.gcp.gc.c.Description,
+                        StrPharmacyGroup = r.gcp.p.Description,
+                        StrUsedinTreatOf = r.t.Description,
+
+                    }).FirstOrDefaultAsync();
+
+                return await ds;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<DO_ReturnParameter> AddOrUpdateGeneric(DO_Generic obj)
+        {
+            var dbContext = _context.Database.BeginTransaction();
+            try
+            {
+                
+
+                if (obj.GenericId == 0)
+                {
+                    var exist = _context.GtEpdrgn.Where(w => w.GenericDesc.ToUpper().Replace(" ", "") == obj.GenericDesc.ToUpper().Replace(" ", "")).FirstOrDefault();
+                    if (exist != null)
+                    {
+                        return new DO_ReturnParameter() { Status = false, Message = "Generic Name Is Already In Use." };
+                    }
+                    int serial = _context.GtEpdrgn.Select(s => s.GenericId).DefaultIfEmpty().Max();
+                        serial = serial + 1;
+                        var _generic = new GtEpdrgn()
+                        {
+                            GenericId = serial,
+                            GenericDesc=obj.GenericDesc,
+                            IsCombiDrug = obj.IsCombiDrug,
+                            TheraupaticClass = obj.TheraupaticClass,
+                            PharmacyGroup = obj.PharmacyGroup,
+                            UsedinTreatOf = obj.UsedinTreatOf,
+                            NoOfManufacturers = obj.NoOfManufacturers,
+                            NoOfComposition = obj.NoOfComposition,
+                            NoOfBrands = obj.NoOfBrands,
+                            NoOfVendors = obj.NoOfVendors,
+                            UsageStatus = obj.UsageStatus,
+                            ActiveStatus = obj.ActiveStatus,
+                            CreatedBy = obj.UserID,
+                            CreatedOn = DateTime.Now,
+                            CreatedTerminal = obj.TerminalID
+                        };
+                        _context.GtEpdrgn.Add(_generic);
+                    
+                }
+                else
+                {
+                    var exist = _context.GtEpdrgn.Where(w => w.GenericDesc.ToUpper().Replace(" ", "") == obj.GenericDesc.ToUpper().Replace(" ", "") && w.GenericId != obj.GenericId).FirstOrDefault();
+                    if (exist != null)
+                    {
+                        return new DO_ReturnParameter() { Status = false, Message = "Generic Name Is Already In Use." };
+                    }
+                    var _generic = _context.GtEpdrgn.Where(w => w.GenericId == obj.GenericId).FirstOrDefault();
+                    if(_generic == null)
+                    {
+                        return new DO_ReturnParameter() { Status = false, Message = "Generic ID Does Not Exist" };
+                    }
+                    else
+                    {
+                        _generic.GenericDesc = obj.GenericDesc;
+                        _generic.IsCombiDrug = obj.IsCombiDrug;
+                        _generic.TheraupaticClass = obj.TheraupaticClass;
+                        _generic.PharmacyGroup = obj.PharmacyGroup;
+                        _generic.UsedinTreatOf = obj.UsedinTreatOf;
+                        _generic.NoOfManufacturers = obj.NoOfManufacturers;
+                        _generic.NoOfComposition = obj.NoOfComposition;
+                        _generic.NoOfBrands = obj.NoOfBrands;
+                        _generic.NoOfVendors = obj.NoOfVendors;
+                        _generic.UsageStatus = obj.UsageStatus;
+                        _generic.ActiveStatus = obj.ActiveStatus;
+                        _generic.ModifiedBy = obj.UserID;
+                        _generic.ModifiedOn = DateTime.Now;
+                        _generic.ModifiedTerminal = obj.TerminalID;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                dbContext.Commit();
+
+                return new DO_ReturnParameter() { Status = true, Message = "Saved Successfully." };
+            }
+            catch (DbUpdateException ex)
+            {
+                dbContext.Rollback();
+                throw ex;
+            }
+            catch (Exception ex)
+            {
+                dbContext.Rollback();
+                throw ex;
+            }
+        }
+        #endregion
+
+        #region Composition
+        public async Task<List<DO_Composition>> GetCompositionByPrefix(string prefix)
+        {
+            try
+            {
+
+                var ds = _context.GtEpdrco
+                    .GroupJoin(_context.GtEpdtms,
+                      g => g.DrugForm,
+                      c => c.Id,
+                      (g, c) => new { g, c = c.FirstOrDefault() }
+                      )
+                    .GroupJoin(_context.GtEpdtms,
+                      gc => gc.g.Dosage,
+                      p => p.Id,
+                      (gc, p) => new { gc, p = p.FirstOrDefault() }
+                      )
+                      
+                    .Where(w => (w.gc.g.CompositionDesc.StartsWith(prefix) || prefix == "All"))
+                    .Select(r => new DO_Composition
+                    {
+                        CompositionId = r.gc.g.CompositionId,
+                        CompositionDesc = r.gc.g.CompositionDesc,
+                        DrugForm = r.gc.g.DrugForm,
+                        Dosage = r.gc.g.Dosage,
+                        ActiveStatus = r.gc.g.ActiveStatus,
+                        StrDrugForm = r.gc.c.Description,
+                        StrDosage = r.p.Description
+                    }).OrderBy(o => o.CompositionDesc).ToListAsync();
+
+                return await ds;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<DO_Composition> GetCompositionByID(int CompositionID)
+        {
+            try
+            {
+
+                var ds = _context.GtEpdrco
+                    .GroupJoin(_context.GtEpdtms,
+                      g => g.DrugForm,
+                      c => c.Id,
+                      (g, c) => new { g, c = c.FirstOrDefault() }
+                      )
+                    .GroupJoin(_context.GtEpdtms,
+                      gc => gc.g.Dosage,
+                      p => p.Id,
+                      (gc, p) => new { gc, p = p.FirstOrDefault() }
+                      )
+                      
+                    .Where(w => w.gc.g.CompositionId == CompositionID)
+                    .Select(r => new DO_Composition
+                    {
+                        CompositionId = r.gc.g.CompositionId,
+                        CompositionDesc = r.gc.g.CompositionDesc,
+                        DrugForm = r.gc.g.DrugForm,
+                        Dosage = r.gc.g.Dosage,
+                        ActiveStatus = r.gc.g.ActiveStatus,
+                        StrDrugForm = r.gc.c.Description,
+                        StrDosage = r.p.Description
+
+                    }).FirstOrDefaultAsync();
+
+                return await ds;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<DO_ReturnParameter> AddOrUpdateComposition(DO_Composition obj)
+        {
+            var dbContext = _context.Database.BeginTransaction();
+            try
+            {
+
+
+                if (obj.CompositionId == 0)
+                {
+                    var exist = _context.GtEpdrco.Where(w => w.CompositionDesc.ToUpper().Replace(" ", "") == obj.CompositionDesc.ToUpper().Replace(" ", "")).FirstOrDefault();
+                    if (exist != null)
+                    {
+                        return new DO_ReturnParameter() { Status = false, Message = "Composition Name Is Already In Use." };
+                    }
+                    int serial = _context.GtEpdrco.Select(s => s.CompositionId).DefaultIfEmpty().Max();
+                    serial = serial + 1;
+                    var _composition = new GtEpdrco()
+                    {
+                        CompositionId = serial,
+                        CompositionDesc = obj.CompositionDesc,
+                        DrugForm = obj.DrugForm,
+                        Dosage = obj.Dosage,
+                        ActiveStatus = obj.ActiveStatus,
+                        CreatedBy = obj.UserID,
+                        CreatedOn = DateTime.Now,
+                        CreatedTerminal = obj.TerminalID
+                    };
+                    _context.GtEpdrco.Add(_composition);
+
+                }
+                else
+                {
+                    var exist = _context.GtEpdrco.Where(w => w.CompositionDesc.ToUpper().Replace(" ", "") == obj.CompositionDesc.ToUpper().Replace(" ", "") && w.CompositionId != obj.CompositionId).FirstOrDefault();
+                    if (exist != null)
+                    {
+                        return new DO_ReturnParameter() { Status = false, Message = "Composition Name Is Already In Use." };
+                    }
+                    var _composition = _context.GtEpdrco.Where(w => w.CompositionId == obj.CompositionId).FirstOrDefault();
+                    if (_composition == null)
+                    {
+                        return new DO_ReturnParameter() { Status = false, Message = "Composition ID Does Not Exist" };
+                    }
+                    else
+                    {
+                        _composition.CompositionDesc = obj.CompositionDesc;
+                        _composition.DrugForm = obj.DrugForm;
+                        _composition.Dosage = obj.Dosage;
+                        _composition.ActiveStatus = obj.ActiveStatus;
+                        _composition.ModifiedBy = obj.UserID;
+                        _composition.ModifiedOn = DateTime.Now;
+                        _composition.ModifiedTerminal = obj.TerminalID;
+                    }
+                }
+
+                await _context.SaveChangesAsync();
+                dbContext.Commit();
+
+                return new DO_ReturnParameter() { Status = true, Message = "Saved Successfully." };
+            }
+            catch (DbUpdateException ex)
+            {
+                dbContext.Rollback();
+                throw ex;
+            }
+            catch (Exception ex)
+            {
+                dbContext.Rollback();
+                throw ex;
+            }
+        }
+        #endregion
+
+        #region Generic/Composition Link
+        public async Task<List<DO_GenericComposition>> GetGenericComposition()
+        {
+            try
+            {
+
+                var ds = _context.GtEpdrgc
+                    .GroupJoin(_context.GtEpdrgn,
+                      l => l.GenericId,
+                      g => g.GenericId,
+                      (l, g) => new { l, g = g.FirstOrDefault() }
+                      )
+                    .GroupJoin(_context.GtEpdrco,
+                      lg => lg.l.CompositionId,
+                      c => c.CompositionId,
+                      (lg, c) => new { lg, c = c.FirstOrDefault() }
+                      )
+                    .Select(r => new DO_GenericComposition
+                    {
+                        GenericId = r.lg.l.GenericId,
+                        GenericDesc = r.lg.g.GenericDesc,
+                        CompositionId=r.lg.l.CompositionId,
+                        CompositionDesc=r.c.CompositionDesc,
+                        ActiveStatus = r.lg.l.ActiveStatus,
+                    }).OrderBy(o => o.GenericDesc).ToListAsync();
+
+                return await ds;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<DO_GenericComposition> GetGenericCompositionByID(int GenericID,int CompositionID)
+        {
+            try
+            {
+
+                var ds = _context.GtEpdrgc
+                    .Where(w => w.GenericId == GenericID && w.CompositionId == CompositionID)
+                    .Select(r => new DO_GenericComposition
+                    {
+                        GenericId = r.GenericId,
+                        CompositionId=r.CompositionId,
+                        ActiveStatus=r.ActiveStatus
+                    }).FirstOrDefaultAsync();
+
+                return await ds;
+
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+        public async Task<DO_ReturnParameter> AddOrUpdateGenericComposition(DO_GenericComposition obj)
+        {
+            var dbContext = _context.Database.BeginTransaction();
+            try
+            {
+                    var _genericcomposition = _context.GtEpdrgc.Where(w => w.GenericId == obj.GenericId && w.CompositionId==obj.CompositionId).FirstOrDefault();
+                    if (_genericcomposition == null)
+                    {
+                    var _newrecord = new GtEpdrgc()
+                    {
+                        GenericId = obj.GenericId,
+                        CompositionId = obj.CompositionId,
+                        ActiveStatus = obj.ActiveStatus,
+                        CreatedBy = obj.UserID,
+                        CreatedOn = DateTime.Now,
+                        CreatedTerminal = obj.TerminalID
+                    };
+                    _context.GtEpdrgc.Add(_newrecord);
+                }
+                    else
+                    {
+                        _genericcomposition.ActiveStatus = obj.ActiveStatus;
+                        _genericcomposition.ModifiedBy = obj.UserID;
+                        _genericcomposition.ModifiedOn = DateTime.Now;
+                        _genericcomposition.ModifiedTerminal = obj.TerminalID;
+                    }
+                
+
+                await _context.SaveChangesAsync();
+                dbContext.Commit();
+
+                return new DO_ReturnParameter() { Status = true, Message = "Saved Successfully." };
+            }
+            catch (DbUpdateException ex)
+            {
+                dbContext.Rollback();
+                throw ex;
+            }
+            catch (Exception ex)
+            {
+                dbContext.Rollback();
+                throw ex;
+            }
+        }
+        #endregion
+    }
+}

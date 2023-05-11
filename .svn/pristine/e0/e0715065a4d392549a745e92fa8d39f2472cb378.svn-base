@@ -1,0 +1,42 @@
+﻿using eSyaPharma.DL.Repository;
+using eSyaPharma.DO;
+using eSyaPharma.IF;
+using Microsoft.AspNetCore.Mvc;
+using System.Threading.Tasks;
+
+namespace eSyaPharma.WebAPI.Controllers
+{
+    [Route("api/[controller]/[action]")]
+    [ApiController]
+    public class DrugBrandController : ControllerBase
+    {
+        private readonly IDrugBrandRepository _drugBrandRepository;
+        public DrugBrandController(IDrugBrandRepository DrugBrandRepository)
+        {
+            _drugBrandRepository = DrugBrandRepository;
+        }
+
+        /// <summary>
+        /// Getting  Drug Category List.
+        /// UI Reffered - Drug Category Grid
+        /// </summary>
+        [HttpGet]
+        public async Task<IActionResult> GetDrugBrandListByNamePrefix(int drugFormulaId, string drugBrandPrefix)
+        {
+            var store_master = await _drugBrandRepository.GetDrugBrandListByNamePrefix(drugFormulaId, drugBrandPrefix);
+            return Ok(store_master);
+        }
+
+        /// <summary>
+        /// Insert Or Update Drug Brand.
+        /// UI Reffered - Drug Brand
+        /// </summary>
+        [HttpPost]
+        public async Task<IActionResult> InsertOrUpdateDrugBrand(DO_DrugBrand drugBrand)
+        {
+            var msg = await _drugBrandRepository.InsertOrUpdateDrugBrand(drugBrand);
+            return Ok(msg);
+
+        }
+    }
+}

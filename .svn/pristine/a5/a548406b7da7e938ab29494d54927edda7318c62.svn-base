@@ -1,0 +1,169 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using eSyaPharma.DL;
+using eSyaPharma.DL.Entities;
+using eSyaPharma.DO;
+using eSyaPharma.DL.Repository;
+using eSyaPharma.IF;
+using Microsoft.EntityFrameworkCore;
+
+namespace eSyaPharma.DL.Repository
+{
+    public class DrugFormulationRepository : IDrugFormulationRepository
+    {
+        public async Task<List<DO_DrugFormulation>> GetDrugFormulationListByNamePrefix(string drugFormulationPrefix)
+        {
+            try
+            {
+                using (var db = new eSyaEnterprise())
+                {
+                    var result = await db.GtEpdrfr
+                        .Join(db.GtEpdrgn,
+                        t => new { t.GenericId },
+                        b => new { b.GenericId },
+                        (t, b) => new { t, b })
+                         .Join(db.GtEcapcd,
+                        tb => new { ApplicationCode = tb.b.DrugClassId },
+                        d => new { d.ApplicationCode },
+                        (tb, d) => new { tb, d })
+                         .Where(w => w.tb.t.DrugFormulation.StartsWith(drugFormulationPrefix != "All" ? drugFormulationPrefix : ""))
+                        .Select(a => new DO_DrugFormulation
+                        {
+                            GenericId = a.tb.t.GenericId,
+                            GenericDesc = a.tb.b.GenericDesc,
+                            DrugFormulaID = a.tb.t.DrugFormulaId,
+                            DrugFormulation = a.tb.t.DrugFormulation,
+                            DrugClassId = a.tb.b.DrugClassId,
+                            DrugClassDesc = a.d.CodeDesc,
+                            UsageStatus = a.tb.t.UsageStatus,
+                            ActiveStatus = a.tb.t.ActiveStatus
+                        }).ToListAsync();
+                    return result;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertOrUpdateDrugFormulation(DO_DrugFormulation drugFormulation)
+        {
+            try
+            {
+                if (drugFormulation.DrugFormulaID != 0)
+                {
+                    return await UpdateDrugFormulation(drugFormulation);
+                }
+                else
+                {
+                    return await InsertDrugFormulation(drugFormulation);
+                }
+            }
+            catch (Exception)
+            {
+                throw;
+            }
+        }
+
+        public async Task<DO_ReturnParameter> InsertDrugFormulation(DO_DrugFormulation obj)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrfr isFormulationExists = db.GtEpdrfr.FirstOrDefault(c => c.DrugFormulation.ToUpper().Replace(" ", "") == obj.DrugFormulation.ToUpper().Replace(" ", ""));
+
+                        if (isFormulationExists == null)
+                        {
+                            int drugFormulationId = db.GtEpdrfr.Select(c => c.DrugFormulaId).DefaultIfEmpty().Max();
+                            drugFormulationId = drugFormulationId + 1;
+                            var epdrfr = new GtEpdrfr
+                            {
+                                GenericId = obj.GenericId,
+                                DrugFormulaId = drugFormulationId,
+                                DrugFormulation = obj.DrugFormulation,
+                                DosageForm = 0,
+                                UsageStatus = false,
+                                ActiveStatus = obj.ActiveStatus,
+                                CreatedBy = obj.UserID,
+                                CreatedOn = DateTime.Now,
+                                CreatedTerminal = obj.TerminalID
+                            };
+                            db.GtEpdrfr.Add(epdrfr);
+
+                            await db.SaveChangesAsync();
+                            dbContext.Commit();
+                            return new DO_ReturnParameter() { Status = true, Message = "Drug Formulation created Successfully." };
+                        }
+                        else
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Formulation is already in used." };
+                        }
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+
+        public async Task<DO_ReturnParameter> UpdateDrugFormulation(DO_DrugFormulation obj)
+        {
+            using (var db = new eSyaEnterprise())
+            {
+                using (var dbContext = db.Database.BeginTransaction())
+                {
+                    try
+                    {
+                        GtEpdrfr ismnfcExists = db.GtEpdrfr.FirstOrDefault(c => c.DrugFormulaId != obj.DrugFormulaID && c.DrugFormulation.ToUpper().Replace(" ", "") == obj.DrugFormulation.ToUpper().Replace(" ", ""));
+                        if (ismnfcExists != null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Formulation is already exist." };
+                        }
+
+                        GtEpdrfr dc_Id = db.GtEpdrfr.Where(s => s.DrugFormulaId == obj.DrugFormulaID).FirstOrDefault();
+                        if (dc_Id == null)
+                        {
+                            return new DO_ReturnParameter() { Status = false, Message = "Drug Formulation Id does not exist" };
+                        }
+
+                        dc_Id.GenericId = obj.GenericId;
+                        dc_Id.DrugFormulaId = obj.DrugFormulaID;
+                        dc_Id.DrugFormulation = obj.DrugFormulation;
+                        dc_Id.ActiveStatus = obj.ActiveStatus;
+                        dc_Id.ModifiedBy = obj.UserID;
+                        dc_Id.ModifiedOn = DateTime.Now;
+                        dc_Id.ModifiedTerminal = obj.TerminalID;
+                        
+                        await db.SaveChangesAsync();
+                        dbContext.Commit();
+
+                        return new DO_ReturnParameter() { Status = true, Message = "Drug Formulation Updated Successfully." };
+                    }
+                    catch (DbUpdateException ex)
+                    {
+                        dbContext.Rollback();
+                        throw new Exception(CommonMethod.GetValidationMessageFromException(ex));
+                    }
+                    catch (Exception ex)
+                    {
+                        dbContext.Rollback();
+                        throw ex;
+                    }
+                }
+            }
+        }
+    }
+}
